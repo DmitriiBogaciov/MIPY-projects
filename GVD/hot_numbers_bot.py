@@ -133,11 +133,19 @@ class HotNumbersBot:
         now = datetime.now()
         minutes = ((now.minute // 5) + 1) * 5 + 1
         if minutes >= 60:
-            next_time = now.replace(hour=(now.hour + 1) % 24, minute=minutes % 60, second=0, microsecond=0)
+            hour = (now.hour + 1) % 24
+            minute = minutes % 60
+            next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if hour == 0 and now.hour == 23:
+                # Новый день: добавить сутки
+                next_time += timedelta(days=1)
         else:
             next_time = now.replace(minute=minutes, second=0, microsecond=0)
+
         wait_time = (next_time - now).total_seconds()
-        print(f"🕒 Ждём до следующего времени ставки: {next_time.strftime('%H:%M:%S')} (через {int(wait_time)} сек.)")
+        if wait_time < 0:
+            # Safety, вдруг что-то не так
+            wait_time = 0
         time.sleep(wait_time)
 
     def get_numbers_from_source(self):
