@@ -1,13 +1,16 @@
 from collections import deque, Counter
 
 class DynamicHotNumbersBot:
-    def __init__(self, initial_bank=500000, min_hot_count=2, history_len=50, top_n=4, bet=500):
+    def __init__(self, initial_bank=500000, min_hot_count=2, history_len=50, top_n=4, bet=3500):
         self.initial_bank = initial_bank
         self.bank = initial_bank
+        self.real_bank = initial_bank
+        self.max_bank = initial_bank 
         self.history = deque(maxlen=history_len)
-        self.min_hot_count = min_hot_count
+        self.min_hot_count = min_hot_count        
         self.top_n = top_n
         self.bet = bet
+        self.max_loss_bank = 0.9
 
     def get_hot_numbers(self):
         counter = Counter(self.history)
@@ -32,10 +35,17 @@ class DynamicHotNumbersBot:
                     self.bank -= len(hot_numbers) * self.bet
                     log.write(f"🎯 Ставка на {sorted(hot_numbers)}. Выпало {number}. ")
                     if number in hot_numbers:
-                        win = self.bet * 36
-                        self.bank += win
-                        profit = win - (len(hot_numbers) * self.bet)
-                        log.write(f"✅ Победа! +{profit} | Банк: {self.bank}\n")
+        
+                        if self.bank < self.max_bank*self.max_loss_bank:
+                            win = self.bet * 36
+                            self.bank += win
+                        else:
+                            win = self.bet * 36
+                            self.bank += win
+                            self.real_bank = self.bank
+                            if self.bank >= self.max_bank: self.max_bank = self.bank
+                            profit = win - (len(hot_numbers) * self.bet)
+                            log.write(f"✅ Победа! +{profit} | Банк: {self.bank}\n")
                     else:
                         log.write(f"Мимо | Банк: {self.bank}\n")
                 else:

@@ -157,61 +157,66 @@ class HotNumbersBot:
             return []
         history = numbers[:self.history_len]
         counter = Counter(history)
+        print("Каунтер: ", counter)
         hot_candidates = [(num, count) for num, count in counter.items() if count >= self.min_hot_count]
-        hot_candidates.sort(key=lambda x: (-x[1], int(x[0])))  # если хочешь по числу, не по строке!
+        hot_candidates.sort(key=lambda x: (-x[1], int(x[0])))
         hot_numbers = [num for num, _ in hot_candidates[:self.top_n]]
         print("Горячие числа: ", hot_numbers)
         return hot_numbers
 
     def bot_loop(self):
         with open('hot_numbers_log.txt', 'a', encoding='utf-8') as log:
-            while self.running:
-                numbers = self.get_numbers_from_source()
-                hot_numbers = self.get_hot_numbers(numbers)
-                if not hot_numbers:
-                    print("Нет горячих чисел, жду минуту...")
-                    time.sleep(60)
-                    continue
-                print(f"🔥 Актуальные горячие числа: {hot_numbers}")
+            numbers = self.get_numbers_from_source()
+            print("Последние 50 чисел: ", numbers[:50])
+            hot_numbers = self.get_hot_numbers(numbers)
+            
+            # while self.running:
+            #     numbers = self.get_numbers_from_source()
+            #     hot_numbers = self.get_hot_numbers(numbers)
+            #     if not hot_numbers:
+            #         print("Нет горячих чисел, жду минуту...")
+            #         time.sleep(60)
+            #         continue
+            #     print(f"🔥 Актуальные горячие числа: {hot_numbers}")
 
-                for bet_number in hot_numbers:
-                    self.place_bet(bet_number)
-                    # self.confirm_bet()
-                    time.sleep(self.random_delay())
-                self.move_to_history()
+            #     for bet_number in hot_numbers:
+            #         self.place_bet(bet_number)
+            #         # self.confirm_bet()
+            #         time.sleep(self.random_delay())
+            #     self.move_to_history()
 
-                self.wait_until_next_bet_time()
-                time.sleep(random.uniform(20, 40))
-                self.refresh_page()
-                time.sleep(self.random_delay())
-                self.move_to_roulette()
-                self.refresh_page()
-                time.sleep(self.random_delay())
+            #     self.wait_until_next_bet_time()
+            #     time.sleep(random.uniform(20, 40))
+            #     self.refresh_page()
+            #     time.sleep(self.random_delay())
+            #     self.move_to_roulette()
+            #     self.refresh_page()
+            #     time.sleep(self.random_delay())
 
-                latest_numbers = self.get_numbers_from_source()
-                latest_result = latest_numbers[0] if latest_numbers else None
+            #     latest_numbers = self.get_numbers_from_source()
+            #     latest_result = latest_numbers[0] if latest_numbers else None
 
-                # Профит за раунд
-                total_bet = len(hot_numbers) * self.bet_amount
-                win = latest_result in hot_numbers
-                if win:
-                    win_amount = self.bet_amount * 36
-                    round_profit = win_amount - total_bet
-                else:
-                    round_profit = -total_bet
-                self.profit += round_profit
-                self.save_profit()
+            #     # Профит за раунд
+            #     total_bet = len(hot_numbers) * self.bet_amount
+            #     win = latest_result in hot_numbers
+            #     if win:
+            #         win_amount = self.bet_amount * 36
+            #         round_profit = win_amount - total_bet
+            #     else:
+            #         round_profit = -total_bet
+            #     self.profit += round_profit
+            #     self.save_profit()
 
-                log_entry = (
-                    f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-                    f"Горячие числа: {hot_numbers} | "
-                    f"Выпало: {latest_result} | "
-                    f"{'✅ Победа' if win else '❌ Мимо'} | "
-                    f"Профит: {round_profit} | Суммарный профит: {self.profit}\n"
-                )
-                print(log_entry.strip())
-                log.write(log_entry)
-                log.flush()
+            #     log_entry = (
+            #         f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+            #         f"Горячие числа: {hot_numbers} | "
+            #         f"Выпало: {latest_result} | "
+            #         f"{'✅ Победа' if win else '❌ Мимо'} | "
+            #         f"Профит: {round_profit} | Суммарный профит: {self.profit}\n"
+            #     )
+            #     print(log_entry.strip())
+            #     log.write(log_entry)
+            #     log.flush()
 
     def toggle_bot(self):
         self.running = not self.running
