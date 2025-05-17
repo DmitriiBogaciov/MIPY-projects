@@ -17,7 +17,7 @@ class HotNumbersBot:
                  hotkey="f6",
                  bet_amount=500,
                  profit_file="profit_state.txt",
-                 initial_bank=260000
+                 initial_bank=217000
                  ):
         self.initial_bank = initial_bank
         self.history_len = history_len
@@ -30,7 +30,7 @@ class HotNumbersBot:
         self.profit = self.load_profit()
         self.bank = self.load_bank()
         self.real_bank = self.load_real_bank()
-        self.max_bank = self.bank
+        self.max_bank = self.load_max_bank()
         self.stop_loss = 0.9
         self.in_pause = False
         
@@ -127,6 +127,21 @@ class HotNumbersBot:
     def save_real_bank(self):
         with open("real_bank_state.txt", 'w', encoding='utf-8') as f:
             f.write(str(self.real_bank))
+    
+    def load_max_bank(self):
+        file = "max_bank_state.txt"
+        if os.path.exists(file):
+            with open(file, 'r', encoding='utf-8') as f:
+                value = f.read().strip()
+                try:
+                    return int(value)
+                except Exception:
+                    pass
+        return self.real_bank  # или self.initial_bank
+
+    def save_max_bank(self):
+        with open("max_bank_state.txt", 'w', encoding='utf-8') as f:
+            f.write(str(self.max_bank))
 
     def random_delay(self):
         return random.uniform(*self.delay_range)
@@ -247,6 +262,7 @@ class HotNumbersBot:
                     self.bank += round_profit
                     if self.bank > self.max_bank:
                         self.max_bank = self.bank
+                        self.save_max_bank()
                 else:
                     round_profit = -total_bet
                   
