@@ -31,7 +31,7 @@ class HotNumbersBot:
         self.bank = self.load_bank()
         self.real_bank = self.load_real_bank()
         self.max_bank = self.bank
-        self.max_loss = 0.9
+        self.stop_loss = 0.9
         self.in_pause = False
         
 
@@ -206,10 +206,6 @@ class HotNumbersBot:
             # print("Последние 50 чисел: ", numbers[:50])
             hot_numbers = self.get_hot_numbers(numbers)
             
-            if self.bank < self.max_bank * 0.9:
-                self.in_pause = True
-                print(f"Ставки остановлены пока банк не будет {self.max_bank * 0.9}")
-            
             while self.running:
                 numbers = self.get_numbers_from_source()
                 hot_numbers = self.get_hot_numbers(numbers)
@@ -222,18 +218,18 @@ class HotNumbersBot:
                 if not self.in_pause:
                     print("Ставим, ждем..") 
                     for bet_number in hot_numbers:
-                        # self.place_bet(bet_number)
-                        # self.confirm_bet()
+                        self.place_bet(bet_number)
+                        self.confirm_bet()
                         time.sleep(self.random_delay())
-                    # self.move_to_history()
+                    self.move_to_history()
 
                     self.wait_until_next_bet_time()
                     time.sleep(random.uniform(20, 40))
-                    # self.refresh_page()
-                    # time.sleep(self.random_delay())
-                    # self.move_to_roulette()
-                    # self.refresh_page()
-                    # time.sleep(self.random_delay())
+                    self.refresh_page()
+                    time.sleep(self.random_delay())
+                    self.move_to_roulette()
+                    self.refresh_page()
+                    time.sleep(self.random_delay())
                 else:
                     print("Сейчас не ставим, ждем..")
                     self.wait_until_next_bet_time()
@@ -251,18 +247,19 @@ class HotNumbersBot:
                     self.bank += round_profit
                     if self.bank > self.max_bank:
                         self.max_bank = self.bank
-                    if self.bank >= self.max_bank * 0.9:
-                        self.in_pause = False
-                        print(f"Ставки восстановлены, пот.банк: {self.bank}, стоп лосс был: {self.max_bank*0.9}")
-                    if not self.in_pause and self.bank > self.real_bank:
-                        self.real_bank = self.bank
                 else:
                     round_profit = -total_bet
-                    
+                  
                 self.profit += round_profit
-                self.bank += round_profit
                 if not self.in_pause: 
                     self.real_bank = self.bank
+                if not self.in_pause and self.bank < self.max_bank * self.stop_loss:
+                    self.in_pause = True
+                    log.write(f"Идем на паузу пока банк не вернется к {self.real_bank}")
+                if self.in_pause and self.bank >= self.max_bank * self.stop_loss:
+                    self.in_pause = False
+                    log.write(f"Готово, банк пробил отметку {self.real_bank}, начинаем ставить")
+                    
                 self.save_profit()
                 self.save_real_bank()
                 self.save_bank()
