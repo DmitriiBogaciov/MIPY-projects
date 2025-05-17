@@ -5,7 +5,7 @@ import random
 import time
 from collections import Counter
 import get_numbers
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
 class HotNumbersBot:
@@ -16,8 +16,10 @@ class HotNumbersBot:
                  delay_range=(0.8, 1.5),
                  hotkey="f6",
                  bet_amount=500,
-                 profit_file="profit_state.txt"
+                 profit_file="profit_state.txt",
+                 initial_bank=260000
                  ):
+        self.initial_bank = initial_bank
         self.history_len = history_len
         self.min_hot_count = min_hot_count
         self.top_n = top_n
@@ -26,6 +28,11 @@ class HotNumbersBot:
         self.bet_amount = bet_amount
         self.profit_file = profit_file
         self.profit = self.load_profit()
+        self.bank = self.load_bank()
+        self.real_bank = self.load_real_bank()
+        self.max_bank = self.bank
+        self.max_loss = 0.9
+        self.in_pause = False
         
 
         self.running = False
@@ -33,8 +40,8 @@ class HotNumbersBot:
 
         # координаты
         self.BET_POSITIONS_SIWA = {
-            "00": (409, 346),
-            "0": (406, 275),
+            "00": (409, 275),
+            "0": (406, 346),
             "1": (457, 359),
             "2": (456, 311),
             "3": (457, 262),
@@ -90,6 +97,36 @@ class HotNumbersBot:
     def save_profit(self): 
         with open(self.profit_file, 'w', encoding='utf-8') as f:
             f.write(str(self.profit))
+            
+    def load_bank(self):
+        bank_file = "bank_state.txt"
+        if os.path.exists(bank_file):
+            with open(bank_file, 'r', encoding='utf-8') as f:
+                value = f.read().strip()
+                try:
+                    return int(value)
+                except Exception:
+                    pass
+        return self.initial_bank
+    
+    def save_bank(self):
+        with open("bank_state.txt", 'w', encoding='utf-8') as f:
+            f.write(str(self.bank))
+
+    def load_real_bank(self):
+        file = "real_bank_state.txt"
+        if os.path.exists(file):
+            with open(file, 'r', encoding='utf-8') as f:
+                value = f.read().strip()
+                try:
+                    return int(value)
+                except Exception:
+                    pass
+        return self.initial_bank 
+    
+    def save_real_bank(self):
+        with open("real_bank_state.txt", 'w', encoding='utf-8') as f:
+            f.write(str(self.real_bank))
 
     def random_delay(self):
         return random.uniform(*self.delay_range)
@@ -157,66 +194,92 @@ class HotNumbersBot:
             return []
         history = numbers[:self.history_len]
         counter = Counter(history)
-        print("Каунтер: ", counter)
+        # print("Каунтер: ", counter)
         hot_candidates = [(num, count) for num, count in counter.items() if count >= self.min_hot_count]
         hot_candidates.sort(key=lambda x: (-x[1], int(x[0])))
         hot_numbers = [num for num, _ in hot_candidates[:self.top_n]]
-        print("Горячие числа: ", hot_numbers)
         return hot_numbers
 
     def bot_loop(self):
         with open('hot_numbers_log.txt', 'a', encoding='utf-8') as log:
             numbers = self.get_numbers_from_source()
-            print("Последние 50 чисел: ", numbers[:50])
+            # print("Последние 50 чисел: ", numbers[:50])
             hot_numbers = self.get_hot_numbers(numbers)
             
-            # while self.running:
-            #     numbers = self.get_numbers_from_source()
-            #     hot_numbers = self.get_hot_numbers(numbers)
-            #     if not hot_numbers:
-            #         print("Нет горячих чисел, жду минуту...")
-            #         time.sleep(60)
-            #         continue
-            #     print(f"🔥 Актуальные горячие числа: {hot_numbers}")
+            if self.bank < self.max_bank * 0.9:
+                self.in_pause = True
+                print(f"Ставки остановлены пока банк не будет {self.max_bank * 0.9}")
+            
+            while self.running:
+                numbers = self.get_numbers_from_source()
+                hot_numbers = self.get_hot_numbers(numbers)
+                if not hot_numbers:
+                    self.wait_until_next_bet_time()
+                    time.sleep(random.uniform(20, 40))
+                    continue
+                print(f"🔥 Актуальные горячие числа: {hot_numbers}")
 
-            #     for bet_number in hot_numbers:
-            #         self.place_bet(bet_number)
-            #         # self.confirm_bet()
-            #         time.sleep(self.random_delay())
-            #     self.move_to_history()
+                if not self.in_pause:
+                    print("Ставим, ждем..") 
+                    for bet_number in hot_numbers:
+                        # self.place_bet(bet_number)
+                        # self.confirm_bet()
+                        time.sleep(self.random_delay())
+                    # self.move_to_history()
 
-            #     self.wait_until_next_bet_time()
-            #     time.sleep(random.uniform(20, 40))
-            #     self.refresh_page()
-            #     time.sleep(self.random_delay())
-            #     self.move_to_roulette()
-            #     self.refresh_page()
-            #     time.sleep(self.random_delay())
+                    self.wait_until_next_bet_time()
+                    time.sleep(random.uniform(20, 40))
+                    # self.refresh_page()
+                    # time.sleep(self.random_delay())
+                    # self.move_to_roulette()
+                    # self.refresh_page()
+                    # time.sleep(self.random_delay())
+                else:
+                    print("Сейчас не ставим, ждем..")
+                    self.wait_until_next_bet_time()
+                    time.sleep(random.uniform(20, 40))
 
-            #     latest_numbers = self.get_numbers_from_source()
-            #     latest_result = latest_numbers[0] if latest_numbers else None
+                latest_numbers = self.get_numbers_from_source()
+                latest_result = latest_numbers[0] if latest_numbers else None
 
-            #     # Профит за раунд
-            #     total_bet = len(hot_numbers) * self.bet_amount
-            #     win = latest_result in hot_numbers
-            #     if win:
-            #         win_amount = self.bet_amount * 36
-            #         round_profit = win_amount - total_bet
-            #     else:
-            #         round_profit = -total_bet
-            #     self.profit += round_profit
-            #     self.save_profit()
+                # Профит за раунд
+                total_bet = len(hot_numbers) * self.bet_amount
+                win = latest_result in hot_numbers
+                if win:
+                    win_amount = self.bet_amount * 36
+                    round_profit = win_amount - total_bet
+                    self.bank += round_profit
+                    if self.bank > self.max_bank:
+                        self.max_bank = self.bank
+                    if self.bank >= self.max_bank * 0.9:
+                        self.in_pause = False
+                        print(f"Ставки восстановлены, пот.банк: {self.bank}, стоп лосс был: {self.max_bank*0.9}")
+                    if not self.in_pause and self.bank > self.real_bank:
+                        self.real_bank = self.bank
+                else:
+                    round_profit = -total_bet
+                    
+                self.profit += round_profit
+                self.bank += round_profit
+                if not self.in_pause: 
+                    self.real_bank = self.bank
+                self.save_profit()
+                self.save_real_bank()
+                self.save_bank()
 
-            #     log_entry = (
-            #         f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-            #         f"Горячие числа: {hot_numbers} | "
-            #         f"Выпало: {latest_result} | "
-            #         f"{'✅ Победа' if win else '❌ Мимо'} | "
-            #         f"Профит: {round_profit} | Суммарный профит: {self.profit}\n"
-            #     )
-            #     print(log_entry.strip())
-            #     log.write(log_entry)
-            #     log.flush()
+                log_entry = (
+                    f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+                    f"Горячие числа: {hot_numbers} | "
+                    f"Выпало: {latest_result} | "
+                    f"{'✅ Победа' if win else '❌ Мимо'} | "
+                    f"Профит: {round_profit} | "
+                    f"Суммарный профит: {self.profit} | "
+                    f"Потенциальный банк: {self.bank} | Реальный банк: {self.real_bank}\n"
+                )
+                print(log_entry.strip())
+                log.write(log_entry)
+                log.flush()
+                
 
     def toggle_bot(self):
         self.running = not self.running
