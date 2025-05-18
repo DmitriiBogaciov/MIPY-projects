@@ -17,7 +17,7 @@ class HotNumbersBot:
                  hotkey="f6",
                  bet_amount=500,
                  profit_file="profit_state.txt",
-                 initial_bank=217000
+                 initial_bank=250000
                  ):
         self.initial_bank = initial_bank
         self.history_len = history_len
@@ -137,7 +137,7 @@ class HotNumbersBot:
                     return int(value)
                 except Exception:
                     pass
-        return self.real_bank  # или self.initial_bank
+        return self.initial_bank 
 
     def save_max_bank(self):
         with open("max_bank_state.txt", 'w', encoding='utf-8') as f:
@@ -211,7 +211,7 @@ class HotNumbersBot:
         counter = Counter(history)
         # print("Каунтер: ", counter)
         hot_candidates = [(num, count) for num, count in counter.items() if count >= self.min_hot_count]
-        hot_candidates.sort(key=lambda x: (-x[1], int(x[0])))
+        hot_candidates.sort(key=lambda x: (-x[1], x[0]))
         hot_numbers = [num for num, _ in hot_candidates[:self.top_n]]
         return hot_numbers
 
@@ -259,26 +259,28 @@ class HotNumbersBot:
                 if win:
                     win_amount = self.bet_amount * 36
                     round_profit = win_amount - total_bet
-                    self.bank += round_profit
-                    if self.bank > self.max_bank:
-                        self.max_bank = self.bank
-                        self.save_max_bank()
                 else:
                     round_profit = -total_bet
                   
                 self.profit += round_profit
+                self.bank += round_profit
                 if not self.in_pause: 
                     self.real_bank = self.bank
-                if not self.in_pause and self.bank < self.max_bank * self.stop_loss:
-                    self.in_pause = True
-                    log.write(f"Идем на паузу пока банк не вернется к {self.real_bank}")
+                    if self.bank > self.max_bank:
+                        self.max_bank = self.bank
+                        log.write(f"Сохранение max_bank {self.max_bank}")
+                    if self.bank < self.max_bank * self.stop_loss:
+                        self.in_pause = True
+                        log.write(f"Идем на паузу пока банк не вернется к {self.real_bank}")
                 if self.in_pause and self.bank >= self.max_bank * self.stop_loss:
                     self.in_pause = False
                     log.write(f"Готово, банк пробил отметку {self.real_bank}, начинаем ставить")
+                
                     
                 self.save_profit()
                 self.save_real_bank()
                 self.save_bank()
+                self.save_max_bank()
 
                 log_entry = (
                     f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
@@ -292,6 +294,7 @@ class HotNumbersBot:
                 print(log_entry.strip())
                 log.write(log_entry)
                 log.flush()
+                print(f"Max: {self.max_bank}, Bank: {self.bank}, Real: {self.real_bank}")
                 
 
     def toggle_bot(self):
